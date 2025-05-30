@@ -1,5 +1,5 @@
 # %% [markdown]
-# ## 2) Model Training (Conv1D + BiGRU + Attention with Custom Layer)
+# ## 2) Model Training (Focused Data with Conv1D + BiGRU + Attention)
 
 # %%
 import numpy as np
@@ -28,11 +28,10 @@ tf.random.set_seed(42)
 
 # --- Configuration ---
 CONFIG = {
-    # From user's original data collection
     'actions': ['book','drink','eat','hold','push','sleep','take','thankyou','help', 'more', 'no','hello','yes'],
     'sequence_length': 32,
-    'data_path': 'raw_data', # Point to RAW data path
-    'model_save_path': 'sign_language_model_attention', # New path for this model
+    'data_path': 'Mudras_Focused/raw_data_focused', # *** UPDATED: Path to focused raw data ***
+    'model_save_path': 'sign_language_model_focused_attention', # *** UPDATED: New model path ***
     'batch_size': 32,
     'epochs': 150, 
     'learning_rate': 0.0005, 
@@ -44,57 +43,52 @@ CONFIG = {
     'reduce_lr_patience': 10,
     'use_data_augmentation': True,
     'use_class_weights': True,
+    # From focused data collection: 7 upper body pose landmarks
+    'NUM_SELECTED_POSE_LANDMARKS': 7,
 }
 
 os.makedirs(CONFIG['model_save_path'], exist_ok=True)
 
-# --- Custom Attention Layer ---
+# --- Custom Attention Layer (Same as before) ---
 @tf.keras.utils.register_keras_serializable(package='CustomLayers')
 class AttentionWeightedAverage(layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def call(self, inputs):
-        # inputs is a list: [gru_output, attention_probs]
-        # gru_output shape: (batch_size, time_steps, gru_units)
-        # attention_probs shape: (batch_size, time_steps, 1)
         if not isinstance(inputs, list) or len(inputs) != 2:
             raise ValueError('A list of two tensors is expected. '
                              f'Got: {inputs}')
-        
         gru_output, attention_probs = inputs
-        
-        # Multiply GRU output by attention probabilities (element-wise broadcasting)
         weighted_sequence = gru_output * attention_probs
-        
-        # Summing along the time_steps dimension to get the context_vector
-        # context_vector shape: (batch_size, gru_units)
         context_vector = tf.reduce_sum(weighted_sequence, axis=1)
         return context_vector
 
     def get_config(self):
-        # No specific config needed for this simple layer,
-        # but it's good practice to include it.
         base_config = super().get_config()
         return base_config
 
 
-# --- Data Processor (Same as before, ensures consistency) ---
+# --- Data Processor ---
 class SimpleDataProcessor:
     def __init__(self, config):
         self.config = config
         self.scaler = StandardScaler()
-        self.expected_raw_size = (33 * 4) + (468 * 3) + (21 * 3) + (21 * 3) # 1662
+        # *** UPDATED: Expected raw size for focused data ***
+        # Pose: NUM_SELECTED_POSE_LANDMARKS * 4 (x,y,z,vis)
+        # Hands: 2 * 21 landmarks * 3 (x,y,z)
+        self.expected_raw_size = (self.config['NUM_SELECTED_POSE_LANDMARKS'] * 4) + (2 * 21 * 3) 
+        print(f"DataProcessor initialized. Expected raw size per frame: {self.expected_raw_size}")
+
 
     def load_raw_data(self):
-        print("Loading RAW data...")
+        print(f"Loading RAW data from: {self.config['data_path']}")
         sequences = []
         labels = []
         padded_count = 0
         truncated_count = 0
         skipped_count = 0
         action_counts = {action: 0 for action in self.config['actions']}
-
 
         for action in self.config['actions']:
             action_path = os.path.join(self.config['data_path'], action)
@@ -130,7 +124,7 @@ class SimpleDataProcessor:
                     try:
                         keypoints = np.load(frame_path)
                         if keypoints.size != self.expected_raw_size:
-                           print(f"Skipping {seq_path}/{frame_file}: Incorrect size {keypoints.size}, expected {self.expected_raw_size}")
+                           print(f"Skipping {action}/{seq_folder}/{frame_file}: Incorrect size {keypoints.size}, expected {self.expected_raw_size}")
                            valid_seq = False
                            break
                         current_sequence_frames.append(keypoints)
@@ -162,7 +156,7 @@ class SimpleDataProcessor:
                 action_counts[action] += 1
 
         if not sequences:
-            raise ValueError("No valid sequences found! Check the raw_data_path and ensure .npy files exist in numbered sequence folders.")
+            raise ValueError("No valid sequences found! Check the raw_data_path and ensure .npy files exist in numbered sequence folders and match expected_raw_size.")
 
         print(f"Padded: {padded_count}, Truncated: {truncated_count}, Skipped: {skipped_count}")
         for action, count in action_counts.items():
@@ -170,32 +164,37 @@ class SimpleDataProcessor:
 
         X = np.array(sequences)
         y = np.array(labels)
-        print(f"Loaded {len(X)} sequences with shape: {X.shape}")
+        print(f"Loaded {len(X)} sequences with final shape: {X.shape}") # Shape: (num_sequences, seq_length, raw_features)
         return X, y
 
     def preprocess_data(self, X, fit_scaler=True):
         print("Applying preprocessing (Scaling + Temporal)...")
         original_shape = X.shape 
 
-        X_reshaped = X.reshape(-1, X.shape[-1])
+        X_reshaped = X.reshape(-1, X.shape[-1]) # X.shape[-1] is num_raw_features (e.g., 154)
         if fit_scaler:
             X_scaled_flat = self.scaler.fit_transform(X_reshaped)
         else:
             X_scaled_flat = self.scaler.transform(X_reshaped)
-        X_scaled = X_scaled_flat.reshape(original_shape)
+        X_scaled = X_scaled_flat.reshape(original_shape) # Back to (num_sequences, seq_length, num_raw_features)
 
+        # Temporal Features
         X_diff1 = np.diff(X_scaled, axis=1, prepend=X_scaled[:, :1, :])
         X_diff2 = np.diff(X_diff1, axis=1, prepend=X_diff1[:, :1, :])
         
-        velocity_mag = np.linalg.norm(X_diff1, axis=-1, keepdims=True)
+        velocity_mag = np.linalg.norm(X_diff1, axis=-1, keepdims=True) # axis=-1 is the feature axis
         acceleration_mag = np.linalg.norm(X_diff2, axis=-1, keepdims=True)
         
+        # Concatenate along the feature axis (last axis)
         X_enhanced = np.concatenate([X_scaled, X_diff1, X_diff2, velocity_mag, acceleration_mag], axis=-1)
+        # Expected shape: (num_sequences, seq_length, num_raw_features*3 + 2)
+        # e.g., (num_sequences, 32, 154*3 + 2 = 462 + 2 = 464)
 
-        print(f"Final feature dimension: {X_enhanced.shape[-1]}")
+        print(f"Data shape after scaling: {X_scaled.shape}")
+        print(f"Data shape after adding temporal features (final input to model): {X_enhanced.shape}")
         return X_enhanced
 
-# --- Data Augmentation ---
+# --- Data Augmentation (Same as before) ---
 class AdvancedDataAugmentation:
     @staticmethod
     def gaussian_noise(s, noise_factor=0.005): 
@@ -228,11 +227,11 @@ class AdvancedDataAugmentation:
             if np.random.random() < 0.4: augmented = cls.scaling(augmented)   
         return augmented
 
-# --- Attention Model (Conv1D + BiGRU + Custom Attention) ---
+# --- Attention Model (Conv1D + BiGRU + Custom Attention - Same architecture) ---
 class AttentionSignLanguageModel:
     def __init__(self, config, input_shape, num_classes):
         self.config = config
-        self.input_shape = input_shape 
+        self.input_shape = input_shape # (sequence_length, num_features_after_preprocessing)
         self.num_classes = num_classes
 
     def create_model(self):
@@ -266,7 +265,6 @@ class AttentionSignLanguageModel:
 
         # Attention Mechanism
         attention_probs = layers.Dense(1, activation='softmax', name='attention_probs')(gru_output)
-        # Using the custom layer here
         context_vector = AttentionWeightedAverage(name='attention_weighted_average')([gru_output, attention_probs])
 
         # Classification Head
@@ -280,18 +278,18 @@ class AttentionSignLanguageModel:
 
         outputs = layers.Dense(self.num_classes, activation='softmax', name='predictions')(x)
 
-        model = Model(inputs=inputs, outputs=outputs, name='AttentionSignClassifier')
+        model = Model(inputs=inputs, outputs=outputs, name='FocusedAttentionSignClassifier') # Updated model name
         return model
 
     def build_model(self):
         self.model = self.create_model()
         optimizer = Adam(learning_rate=self.config['learning_rate'])
         self.model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-        print("\nAttention Model Summary:")
+        print("\nFocused Attention Model Summary:")
         self.model.summary(line_length=120)
         return self.model
 
-# --- Data Generator ---
+# --- Data Generator (Same as before) ---
 class EfficientDataGenerator(tf.keras.utils.Sequence):
     def __init__(self, X, y, batch_size, config, shuffle=True, augment=False):
         self.X = X 
@@ -324,7 +322,7 @@ class EfficientDataGenerator(tf.keras.utils.Sequence):
         if self.shuffle:
             np.random.shuffle(self.indices)
 
-# --- Trainer ---
+# --- Trainer (Same as before) ---
 class ModelTrainer: 
     def __init__(self, config):
         self.config = config
@@ -375,34 +373,39 @@ class ModelTrainer:
 
 # --- Main Execution ---
 def main():
-    print("=== Attention-based Sign Language Gesture Classification (with Custom Layer) ===")
+    print("=== Focused Data Sign Language Classification (Attention Model) ===")
 
     data_processor = SimpleDataProcessor(CONFIG)
     try:
-        X_raw, y = data_processor.load_raw_data()
+        X_raw, y = data_processor.load_raw_data() # X_raw has shape (num_seq, seq_len, 154)
     except ValueError as e:
         print(f"Error loading data: {e}")
-        print("Please ensure your 'Mudras/raw_data' directory is correctly populated with .npy files for each action and sequence.")
         return
 
-    X = data_processor.preprocess_data(X_raw, fit_scaler=True)
+    # X will have shape (num_seq, seq_len, 464) after preprocessing
+    X = data_processor.preprocess_data(X_raw, fit_scaler=True) 
 
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
-    y_categorical = to_categorical(y_encoded, num_classes=len(CONFIG['actions']))
+    # y_categorical = to_categorical(y_encoded, num_classes=len(CONFIG['actions'])) # We'll do this after splitting
     
-    X_temp, X_test, y_temp, y_test_encoded = train_test_split(
+    X_temp, X_test, y_temp_encoded, y_test_encoded = train_test_split(
         X, y_encoded, test_size=CONFIG['test_split'], random_state=42, stratify=y_encoded)
     
     X_train, X_val, y_train_encoded, y_val_encoded = train_test_split(
-        X_temp, y_temp, test_size=CONFIG['validation_split']/(1-CONFIG['test_split']),
-        random_state=42, stratify=y_temp) 
+        X_temp, y_temp_encoded, test_size=CONFIG['validation_split']/(1-CONFIG['test_split']),
+        random_state=42, stratify=y_temp_encoded) 
 
+    # Convert encoded labels to categorical for training/evaluation
     y_train = to_categorical(y_train_encoded, num_classes=len(CONFIG['actions']))
     y_val = to_categorical(y_val_encoded, num_classes=len(CONFIG['actions']))
     y_test = to_categorical(y_test_encoded, num_classes=len(CONFIG['actions']))
 
-    print(f"Training: {X_train.shape}, Validation: {X_val.shape}, Test: {X_test.shape}")
+
+    print(f"Training data shape: X_train: {X_train.shape}, y_train: {y_train.shape}")
+    print(f"Validation data shape: X_val: {X_val.shape}, y_val: {y_val.shape}")
+    print(f"Test data shape: X_test: {X_test.shape}, y_test: {y_test.shape}")
+
 
     class_weight_dict = None
     if CONFIG['use_class_weights']:
@@ -411,29 +414,36 @@ def main():
         class_weight_dict = dict(enumerate(class_weights_values))
         print("Class weights:", class_weight_dict)
 
-    model_builder = AttentionSignLanguageModel(CONFIG, (X_train.shape[1], X_train.shape[2]), len(CONFIG['actions']))
+    # Input shape for the model is (sequence_length, num_features_after_preprocessing)
+    # X_train.shape[1] is sequence_length (e.g., 32)
+    # X_train.shape[2] is num_features_after_preprocessing (e.g., 464)
+    model_input_shape = (X_train.shape[1], X_train.shape[2]) 
+    print(f"Model input shape will be: {model_input_shape}")
+
+    model_builder = AttentionSignLanguageModel(CONFIG, model_input_shape, len(CONFIG['actions']))
     model = model_builder.build_model()
     
     trainer = ModelTrainer(CONFIG)
-    history = trainer.train_model(model, X_train, y_train, X_val, y_val, class_weight_dict, 'attention_sign_classifier')
+    # Model name for saving checkpoints
+    model_checkpoint_name = 'focused_attention_classifier' 
+    history = trainer.train_model(model, X_train, y_train, X_val, y_val, class_weight_dict, model_checkpoint_name)
 
-    best_model_path = os.path.join(CONFIG['model_save_path'], 'attention_sign_classifier_best.keras')
+    best_model_path = os.path.join(CONFIG['model_save_path'], f'{model_checkpoint_name}_best.keras')
     
-    # Define custom objects for loading
     custom_objects_for_loading = {'AttentionWeightedAverage': AttentionWeightedAverage}
 
     if os.path.exists(best_model_path):
         print(f"Loading best model from: {best_model_path}")
         loaded_model = tf.keras.models.load_model(
             best_model_path, 
-            custom_objects=custom_objects_for_loading, # Pass custom object here
-            compile=False # Recompile after loading
+            custom_objects=custom_objects_for_loading,
+            compile=False 
         )
         loaded_model.compile(optimizer=Adam(learning_rate=CONFIG['learning_rate']),
                              loss='categorical_crossentropy', metrics=['accuracy'])
         model_to_evaluate = loaded_model
     else:
-        print("Best model not found. Evaluating the last trained model.")
+        print(f"Best model not found at {best_model_path}. Evaluating the last trained model.")
         model_to_evaluate = model
 
     print("\nEvaluating model...")
@@ -442,7 +452,9 @@ def main():
     
     y_pred_probs = model_to_evaluate.predict(X_test, batch_size=CONFIG['batch_size'])
     y_pred_indices = np.argmax(y_pred_probs, axis=1)
-    y_true_indices = np.argmax(y_test, axis=1)
+    # y_true_indices = np.argmax(y_test, axis=1) # y_test is already one-hot, use y_test_encoded for true indices
+    y_true_indices = y_test_encoded
+
 
     print("\nClassification Report:")
     print(classification_report(y_true_indices, y_pred_indices, target_names=label_encoder.classes_))
