@@ -1,0 +1,52 @@
+{
+  "glyphs": {
+    "H": {
+      "ha": 800,
+      "x_min": 0,
+      "x_max": 800,
+      "o": "M 100 0 L 100 800 L 180 800 L 180 500 L 620 500 L 620 800 L 700 800 L 700 0 L 620 0 L 620 420 L 180 420 L 180 0 Z"
+    },
+    "e": {
+      "ha": 600,
+      "x_min": 0,
+      "x_max": 600,
+      "o": "M 300 -10 Q 180 -10 90 75 T 0 300 Q 0 430 90 520 T 300 610 Q 420 610 510 520 T 600 300 L 80 300 Q 95 210 165 150 T 300 90 Q 365 90 425 150 L 495 80 Q 420 -10 300 -10 Z M 80 360 L 520 360 Q 505 450 435 505 T 300 560 Q 235 560 165 505 T 80 360 Z"
+    },
+    "l": {
+      "ha": 300,
+      "x_min": 0,
+      "x_max": 300,
+      "o": "M 120 0 L 120 800 L 180 800 L 180 0 Z"
+    },
+    "o": {
+      "ha": 600,
+      "x_min": 0,
+      "x_max": 600,
+      "o": "M 300 -10 Q 180 -10 90 75 T 0 300 Q 0 430 90 520 T 300 610 Q 420 610 510 520 T 600 300 Q 600 170 510 80 T 300 -10 Z M 300 90 Q 365 90 425 150 T 520 300 Q 520 365 460 425 T 300 485 Q 235 485 175 425 T 80 300 Q 80 235 140 175 T 300 90 Z"
+    }
+  },
+  "familyName": "Geist",
+  "ascender": 800,
+  "descender": -200,
+  "underlineThickness": 50,
+  "underlinePosition": -100,
+  "boundingBox": {
+    "yMin": -200,
+    "xMin": -50,
+    "yMax": 800,
+    "xMax": 650
+  },
+  "resolution": 1000,
+  "original_font_information": {
+    "format": 0,
+    "copyright": "",
+    "fontFamily": "Geist",
+    "fontSubfamily": "Regular",
+    "uniqueID": "",
+    "fullName": "Geist Regular",
+    "version": "Version 1.000",
+    "postScriptName": "Geist-Regular"
+  },
+  "cssFontWeight": "normal",
+  "cssFontStyle": "normal"
+}

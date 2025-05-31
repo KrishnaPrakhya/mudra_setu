@@ -282,59 +282,6 @@ export default function PredictPage() {
         ))}
       </div>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-black/10 backdrop-blur-xl border-b border-cyan-400/20">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-3">
-              <div className="relative">
-                <Hand className="h-8 w-8 text-cyan-400" />
-                <motion.div
-                  className="absolute inset-0 h-8 w-8 text-cyan-400"
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 8,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
-                >
-                  <Network className="h-8 w-8" />
-                </motion.div>
-              </div>
-              <div>
-                <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                  NeuroGesture
-                </span>
-                <div className="text-xs text-cyan-400/70 font-mono">
-                  NEURAL PREDICT
-                </div>
-              </div>
-            </Link>
-
-            <div className="flex items-center space-x-6">
-              <Link
-                href="/"
-                className="text-cyan-300/80 hover:text-cyan-300 transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <Link
-                href="/visualize"
-                className="text-cyan-300/80 hover:text-cyan-300 transition-colors"
-              >
-                3D Visualize
-              </Link>
-              <Link
-                href="/dashboard"
-                className="text-cyan-300/80 hover:text-cyan-300 transition-colors"
-              >
-                Analytics
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       <div className="pt-24 pb-12 px-6 relative z-10">
         <div className="container mx-auto max-w-7xl">
           <motion.div
@@ -786,8 +733,8 @@ export default function PredictPage() {
                                       pred.confidence > 85
                                         ? "bg-gradient-to-r from-green-500 to-emerald-500"
                                         : pred.confidence > 70
-                                        ? "bg-gradient-to-r from-yellow-500 to-orange-500"
-                                        : "bg-gradient-to-r from-red-500 to-pink-500"
+                                          ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+                                          : "bg-gradient-to-r from-red-500 to-pink-500"
                                     } text-white`}
                                   >
                                     {pred.confidence}%

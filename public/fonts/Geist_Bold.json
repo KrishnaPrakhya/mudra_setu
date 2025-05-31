@@ -1,0 +1,52 @@
+{
+  "glyphs": {
+    "H": {
+      "ha": 800,
+      "x_min": 0,
+      "x_max": 800,
+      "o": "M 100 0 L 100 800 L 200 800 L 200 500 L 600 500 L 600 800 L 700 800 L 700 0 L 600 0 L 600 400 L 200 400 L 200 0 Z"
+    },
+    "e": {
+      "ha": 600,
+      "x_min": 0,
+      "x_max": 600,
+      "o": "M 300 -10 Q 170 -10 85 75 T 0 300 Q 0 440 85 525 T 300 610 Q 430 610 515 525 T 600 300 L 100 300 Q 115 200 175 145 T 300 90 Q 375 90 435 145 L 515 65 Q 430 -10 300 -10 Z M 100 350 L 500 350 Q 485 450 425 505 T 300 560 Q 225 560 165 505 T 100 350 Z"
+    },
+    "l": {
+      "ha": 300,
+      "x_min": 0,
+      "x_max": 300,
+      "o": "M 100 0 L 100 800 L 200 800 L 200 0 Z"
+    },
+    "o": {
+      "ha": 600,
+      "x_min": 0,
+      "x_max": 600,
+      "o": "M 300 -10 Q 170 -10 85 75 T 0 300 Q 0 440 85 525 T 300 610 Q 430 610 515 525 T 600 300 Q 600 160 515 75 T 300 -10 Z M 300 90 Q 375 90 435 145 T 500 300 Q 500 375 435 430 T 300 485 Q 225 485 165 430 T 100 300 Q 100 225 165 170 T 300 90 Z"
+    }
+  },
+  "familyName": "Geist",
+  "ascender": 800,
+  "descender": -200,
+  "underlineThickness": 50,
+  "underlinePosition": -100,
+  "boundingBox": {
+    "yMin": -200,
+    "xMin": -50,
+    "yMax": 800,
+    "xMax": 650
+  },
+  "resolution": 1000,
+  "original_font_information": {
+    "format": 0,
+    "copyright": "",
+    "fontFamily": "Geist",
+    "fontSubfamily": "Bold",
+    "uniqueID": "",
+    "fullName": "Geist Bold",
+    "version": "Version 1.000",
+    "postScriptName": "Geist-Bold"
+  },
+  "cssFontWeight": "bold",
+  "cssFontStyle": "normal"
+}
