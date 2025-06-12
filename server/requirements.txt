@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+python-multipart
+tensorflow
+mediapipe==0.10.14
+joblib
