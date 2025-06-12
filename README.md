@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mudra Setu - Real-Time Sign Language Recognition Platform
+
+![Mudra Setu](public/next.svg)
+
+Mudra Setu is a cutting-edge real-time sign language recognition platform that bridges the communication gap between the deaf/hard-of-hearing community and others using advanced AI technology.
+
+## 🌟 Key Features
+
+- **Real-Time Recognition**: Instant sign language interpretation through your webcam
+- **High Accuracy**: Utilizing advanced attention-based neural networks with 98.80% accuracy
+- **Hand Landmark Visualization**: Real-time visual feedback with detailed hand tracking
+- **Responsive Design**: Beautiful, modern UI that works across devices
+- **Performance Optimized**: Maintains high FPS for smooth recognition
+- **User-Friendly Interface**: Simple one-click start/stop capture system
+
+## 🚀 Technical Highlights
+
+- **Frontend**: Next.js 14 with TypeScript for type-safe, modern web development
+- **AI Model**: Custom attention-based neural network for sign language recognition
+- **Real-Time Processing**: Efficient frame capture and processing pipeline
+- **Hand Tracking**: Advanced hand landmark detection and visualization
+- **Backend**: Fast API server with Python for ML model inference
 
 ## Getting Started
 
-First, run the development server:
+First, install the dependencies and run the development server:
+
+### Frontend Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Backend Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Navigate to server directory
+cd server
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Install Python dependencies
+pip install -r requirements.txt
 
-## Learn More
+# Start the FastAPI server
+python app.py
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000) with your browser to access the application.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🏗️ Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+├── app/                    # Next.js application routes
+│   ├── (main)/            # Main application pages
+│   │   ├── predict/       # Real-time prediction interface
+│   │   ├── visualize/     # Data visualization components
+│   │   └── model/        # Model performance metrics
+│   └── api/              # API routes
+├── model/                # ML model files and weights
+├── server/              # Python FastAPI backend
+└── components/         # Reusable React components
+```
 
-## Deploy on Vercel
+## 🤖 ML Model Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Our sign language recognition model uses an attention-based neural network architecture that achieves 98.80% accuracy. Key features:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Attention mechanism for focusing on important hand landmarks
+- Enhanced feature extraction for subtle hand movements
+- Robust scaling and preprocessing pipeline
+- Trained on a comprehensive sign language dataset
+
+## 💡 How It Works
+
+1. **Capture**: Real-time video capture through the browser
+2. **Processing**: Frame extraction and preprocessing
+3. **Detection**: Hand landmark detection and tracking
+4. **Recognition**: ML model inference for sign recognition
+5. **Visualization**: Real-time display of results and hand tracking
+
+## 🔧 Advanced Configuration
+
+The application can be configured through various environment variables:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000  # FastAPI backend URL
+MODEL_PATH=./model/sign_model_focused_enhanced_attention_v2_0.9880_prior1  # Model path
+```
+
+## 🚀 Deployment
+
+### Frontend Deployment
+
+The frontend can be easily deployed on Vercel:
+
+```bash
+vercel deploy
+```
+
+### Backend Deployment
+
+The FastAPI backend can be deployed using Docker:
+
+```bash
+cd server
+docker build -t mudra-setu-backend .
+docker run -p 8000:8000 mudra-setu-backend
+```
+
+## 📚 Documentation
+
+- [API Documentation](http://localhost:8000/docs) - FastAPI automatic documentation
+- [Model Architecture](./model/README.md) - Detailed ML model documentation
+- [Contributing Guidelines](./CONTRIBUTING.md) - How to contribute to the project
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Thanks to all contributors who have helped shape Mudra Setu
+- Special thanks to the deaf community for their invaluable feedback
+- Built with Next.js, FastAPI, and TensorFlow
