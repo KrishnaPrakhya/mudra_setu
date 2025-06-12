@@ -1,6 +1,5 @@
 # Mudra Setu - Real-Time Sign Language Recognition Platform
 
-![Mudra Setu]
 
 Mudra Setu is a cutting-edge real-time sign language recognition platform that bridges the communication gap between the deaf/hard-of-hearing community and others using advanced AI technology.
 
