@@ -14,8 +14,6 @@ from collections import deque
 import joblib
 import tensorflow as tf
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 
 # Add the model directory to the path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -52,8 +50,7 @@ PREDICTION_BUFFER_SIZE = 10
 model = None
 scaler = None
 label_encoder = None
-# holistic = None # Replaced with hand_landmarker
-hand_landmarker = None # New HandLandmarker
+holistic = None
 sequence_data_raw = deque(maxlen=SEQUENCE_LENGTH)
 prediction_buffer = deque(maxlen=PREDICTION_BUFFER_SIZE)
 current_prediction = "..."
@@ -62,48 +59,27 @@ actions_map = {}
 
 # --- Initialization ---
 def initialize():
-    global model, scaler, label_encoder, hand_landmarker, actions_map # Updated holistic to hand_landmarker
+    global model, scaler, label_encoder, holistic, actions_map
     
     print(f"Loading resources from: {MODEL_DIR}")
     model = load_model_with_custom_objects(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
     label_encoder = joblib.load(LABEL_ENCODER_PATH)
     
-    if not all([model, scaler, label_encoder]):
+    if not all([model, scaler, label_encoder]):  # 
         print("Fatal: Failed to load one or more ML resources.")
+        # In a real application, you might want to exit or prevent the app from starting
         return
     
     actions_map = {i: action for i, action in enumerate(label_encoder.classes_)}
     print(f"Actions loaded: {actions_map}")
     
-    # Create HandLandmarker options
-    # USER ACTION: You need to download the 'hand_landmarker.task' model file from MediaPipe
-    # and place it in an accessible path. Update 'model_asset_path' accordingly.
-    # Example: model_asset_path = os.path.join(BASE_DIR, 'models', 'hand_landmarker.task')
-    model_asset_path = 'hand_landmarker.task' # <<< --- USER: UPDATE THIS PATH
-    if not os.path.exists(model_asset_path):
-        print(f"ERROR: Hand landmarker model file not found at {model_asset_path}")
-        print("Please download it from https://developers.google.com/mediapipe/solutions/vision/hand_landmarker/python#models")
-        # Decide how to handle this - exit, or run without hand landmarking?
-        # For now, we'll allow the app to run but hand landmarking will fail.
-        # return # Or raise an exception
-
-    base_options = python.BaseOptions(model_asset_path=model_asset_path)
-    options = vision.HandLandmarkerOptions(
-        base_options=base_options,
-        running_mode=vision.RunningMode.VIDEO, # Use VIDEO mode for processing video frames
-        num_hands=2, # Max number of hands to detect
-        min_hand_detection_confidence=0.5,
-        min_hand_presence_confidence=0.5,
+    mp_holistic = mp.solutions.holistic
+    holistic = mp_holistic.Holistic(
+        min_detection_confidence=0.5,
         min_tracking_confidence=0.5
     )
-    try:
-        hand_landmarker = vision.HandLandmarker.create_from_options(options)
-        print("MediaPipe HandLandmarker initialized successfully.")
-    except Exception as e:
-        print(f"Failed to initialize MediaPipe HandLandmarker: {e}")
-        # Decide how to handle this - exit, or run without hand landmarking?
-        # return # Or raise an exception
+    print("MediaPipe Holistic initialized successfully.")
 
 # Initialize on startup
 initialize()
@@ -145,73 +121,34 @@ def process_frame_sync(frame_data: FrameData) -> Dict[str, Any]:
     frame.flags.writeable = False
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
-    # Convert the BGR image to RGB, then to MediaPipe's Image object
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
-    
-    # Get current timestamp in milliseconds for HandLandmarker
-    # This is a placeholder; in a real video stream, you'd use actual frame timestamps
-    timestamp_ms = int(getattr(process_frame_sync, 'timestamp', 0))
-    process_frame_sync.timestamp = timestamp_ms + 1 # Increment for next frame
-
-    # Process with HandLandmarker
-    # NOTE: hand_landmarker might not be initialized if the .task file was not found
-    if hand_landmarker is None:
-        raise RuntimeError("HandLandmarker not initialized. Check model file path.")
-
-    try:
-        # For VIDEO mode, use detect_for_video
-        hand_landmarker_result = hand_landmarker.detect_for_video(mp_image, timestamp_ms)
-    except Exception as e:
-        # This can happen if the model file is invalid or other MediaPipe issues
-        raise RuntimeError(f"Error during hand_landmarker.detect_for_video: {str(e)}")
-
-    frame.flags.writeable = True
+    # Process with MediaPipe
+    results = holistic.process(frame_rgb)  # 
+    frame.flags.writeable = True  # 
     
     # Extract landmark data for frontend visualization
-    # This needs to be adapted based on HandLandmarkerResult structure
-    # HandLandmarkerResult has `hand_landmarks` (list of hands) and `handedness` (list of hands)
-    # Each hand in `hand_landmarks` is a list of NormalizedLandmark objects
     landmarks_for_fe = {
-        'pose': [], # Pose landmarks are NOT available from HandLandmarker
-        'leftHand': [],
-        'rightHand': []
+        'pose': [{'x': p.x, 'y': p.y, 'z': p.z, 'visibility': p.visibility} 
+                 for p in (results.pose_landmarks.landmark if results.pose_landmarks else [])],
+        'leftHand': [{'x': p.x, 'y': p.y, 'z': p.z} 
+                     for p in (results.left_hand_landmarks.landmark if results.left_hand_landmarks else [])],  # 
+        'rightHand': [{'x': p.x, 'y': p.y, 'z': p.z} 
+                      for p in (results.right_hand_landmarks.landmark if results.right_hand_landmarks else [])]
     }
-    if hand_landmarker_result.hand_landmarks:
-        for i, hand_landmarks_proto in enumerate(hand_landmarker_result.hand_landmarks):
-            hand_label = hand_landmarker_result.handedness[i][0].category_name # 'Left' or 'Right'
-            landmarks = [{'x': lm.x, 'y': lm.y, 'z': lm.z} for lm in hand_landmarks_proto]
-            if hand_label == 'Left':
-                landmarks_for_fe['leftHand'] = landmarks
-            elif hand_label == 'Right':
-                landmarks_for_fe['rightHand'] = landmarks
 
-    # If no hands are detected, we might not proceed or return a specific message.
-    # The original code checked for pose_landmarks. Now we check for hand_landmarks.
-    if not hand_landmarker_result.hand_landmarks:
+    # If no pose is detected, we can't proceed with prediction
+    if not results.pose_landmarks:
         return {
-            "prediction": "No hands detected", # Updated message
-            "confidence": 0.0,
+            "prediction": "No pose detected",
+            "confidence": 0.0,  # 
             "landmarks": landmarks_for_fe
         }
 
     # Extract keypoints for the model
-    # IMPORTANT: `extract_focused_keypoints_realtime` was designed for Holistic output.
-    # It will LIKELY FAIL or produce incorrect results with HandLandmarkerResult.
-    # This function (in predict.py) needs to be updated to accept HandLandmarkerResult
-    # and extract relevant keypoints. It previously might have used pose landmarks which are no longer available here.
-    # For now, we pass the new result object, but expect this to be a point of failure/required update.
     try:
-        # USER ACTION: Review and update `extract_focused_keypoints_realtime` in `predict.py`
-        # to handle `HandLandmarkerResult` and the absence of pose landmarks from this specific task.
-        # The model's expected input features might also need to change if it relied on pose.
-        keypoints = extract_focused_keypoints_realtime(hand_landmarker_result) # <<< --- LIKELY NEEDS UPDATE
+        keypoints = extract_focused_keypoints_realtime(results)
         sequence_data_raw.append(keypoints)
     except Exception as e:
-        # More specific error message
-        error_msg = f"Error extracting/processing landmarks for model with HandLandmarkerResult: {str(e)}. " \
-                    f"Ensure 'extract_focused_keypoints_realtime' in 'predict.py' is updated for HandLandmarker output " \
-                    f"and handles the absence of pose data from this task."
-        raise RuntimeError(error_msg) from e 
+        raise RuntimeError(f"Error extracting landmarks for model: {str(e)}") from e # 
     
     # Perform prediction only if the sequence is full
     if len(sequence_data_raw) == SEQUENCE_LENGTH:
