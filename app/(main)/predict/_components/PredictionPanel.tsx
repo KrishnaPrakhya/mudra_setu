@@ -1,15 +1,21 @@
 import { memo } from "react";
 
+import { Progress } from "@/components/ui/progress";
+
 interface PredictionPanelProps {
   predictions: string[];
   isCapturing: boolean;
+  isBuffering: boolean;
+  progress: number;
   fps: number;
 }
 
 function PredictionPanel({
   predictions,
   isCapturing,
-  fps,
+  isBuffering,
+  progress,
+  fps = 20,
 }: PredictionPanelProps) {
   return (
     <div className="bg-slate-800 p-6 rounded-xl border border-cyan-400/20">
@@ -28,8 +34,13 @@ function PredictionPanel({
           </div>
         )}
       </div>
-      <div className="space-y-3">
-        {predictions.length > 0 ? (
+      <div className="space-y-3 min-h-[200px]">
+        {isCapturing && isBuffering ? (
+          <div className="flex flex-col justify-center items-center h-full">
+            <p className="text-cyan-300/80 mb-2">Buffering frames...</p>
+            <Progress value={progress * 100} className="w-full" />
+          </div>
+        ) : predictions.length > 0 ? (
           predictions.map((pred, i) => (
             <div
               key={i}
@@ -40,7 +51,9 @@ function PredictionPanel({
           ))
         ) : (
           <div className="p-3 bg-slate-700/50 rounded-lg text-cyan-300/50 border border-cyan-400/20">
-            No predictions yet. Start capture to begin.
+            {isCapturing
+              ? "Waiting for confident prediction..."
+              : "Start capture to begin."}
           </div>
         )}
       </div>

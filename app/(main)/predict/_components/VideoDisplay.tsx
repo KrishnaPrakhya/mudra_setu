@@ -2,9 +2,9 @@ import { memo } from "react";
 import type { RefObject } from "react";
 
 interface VideoDisplayProps {
-  videoRef: RefObject<HTMLVideoElement>;
-  landmarkCanvasRef: RefObject<HTMLCanvasElement>;
-  canvasRef: RefObject<HTMLCanvasElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  landmarkCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
 function VideoDisplay({

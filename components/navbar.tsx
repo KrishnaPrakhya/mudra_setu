@@ -25,9 +25,7 @@ export default function Navbar() {
                   repeat: Number.POSITIVE_INFINITY,
                   ease: "linear",
                 }}
-              >
-                {/* <Network className="h-10 w-10" /> */}
-              </motion.div>
+              ></motion.div>
             </div>
             <div>
               <Link href={"/"}>
@@ -51,6 +49,12 @@ export default function Navbar() {
               className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
             >
               Neural Predict
+            </Link>
+            <Link
+              href="/videoInput"
+              className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
+            >
+              Video Predict
             </Link>
             <Link
               href="/visualize"

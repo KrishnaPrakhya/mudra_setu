@@ -1,235 +1,152 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-import cv2
-import numpy as np
-import base64
-import sys
-import os
-import traceback
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import logging
+import os
+import sys
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from typing import List
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+import os
+import shutil
+from predict_video import predict_on_video
 import joblib
+import numpy as np
 import tensorflow as tf
-import mediapipe as mp
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
-# Add the model directory to the path
+# --- Basic Setup ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Path Setup ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR_REL = os.path.join(BASE_DIR, 'model')
 sys.path.append(MODEL_DIR_REL)
 
-# Import the prediction module
-from predict import load_model_with_custom_objects, extract_focused_keypoints_realtime, add_temporal_features_realtime
+from predict import load_model_with_custom_objects, add_temporal_features_realtime
 
-app = FastAPI()
+# --- FastAPI App Initialization ---
+app = FastAPI(title="Ultra-Fast Sign Language Prediction API")
 
-# Add a thread pool executor for running blocking ML code
-executor = ThreadPoolExecutor(max_workers=os.cpu_count())
-
-# Add CORS middleware 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend's origin
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # 
-    allow_headers=["*"],  # 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- Configuration ---
+# This configuration is validated to match the new frontend extraction logic.
 MODEL_DIR = os.path.join(MODEL_DIR_REL, 'sign_model_focused_enhanced_attention_v2_0.9880_prior1')
 MODEL_PATH = os.path.join(MODEL_DIR, 'corrected_enhanced_focused_attention_classifier_best.keras')
 SCALER_PATH = os.path.join(MODEL_DIR, 'scaler.pkl')
 LABEL_ENCODER_PATH = os.path.join(MODEL_DIR, 'label_encoder.pkl')
 SEQUENCE_LENGTH = 32
-PREDICTION_THRESHOLD = 0.60
-PREDICTION_BUFFER_SIZE = 10
+# Expected count is (7*4 for pose) + (21*3 for left hand) + (21*3 for right hand)
+EXPECTED_LANDMARK_COUNT = 154
+CONFIDENCE_THRESHOLD = 0.70  # High confidence threshold
 
 # --- Global State ---
-model = None
-scaler = None
-label_encoder = None
-holistic = None
-sequence_data_raw = deque(maxlen=SEQUENCE_LENGTH)
-prediction_buffer = deque(maxlen=PREDICTION_BUFFER_SIZE)
-current_prediction = "..."
-current_confidence = 0.0
-actions_map = {}
+model, scaler, label_encoder, actions_map = None, None, None, {}
+executor = ThreadPoolExecutor(max_workers=os.cpu_count())
 
-# --- Initialization ---
-def initialize():
-    global model, scaler, label_encoder, holistic, actions_map
-    
-    print(f"Loading resources from: {MODEL_DIR}")
+@app.on_event("startup")
+def startup_event():
+    global model, scaler, label_encoder, actions_map
+    logger.info("Loading prediction model and scaler...")
     model = load_model_with_custom_objects(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
     label_encoder = joblib.load(LABEL_ENCODER_PATH)
-    
-    if not all([model, scaler, label_encoder]):  # 
-        print("Fatal: Failed to load one or more ML resources.")
-        # In a real application, you might want to exit or prevent the app from starting
-        return
-    
     actions_map = {i: action for i, action in enumerate(label_encoder.classes_)}
-    print(f"Actions loaded: {actions_map}")
-    
-    mp_holistic = mp.solutions.holistic
-    holistic = mp_holistic.Holistic(
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
-    print("MediaPipe Holistic initialized successfully.")
+    logger.info("Resources loaded successfully.")
 
-# Initialize on startup
-initialize()
+def predict_from_landmarks(landmarks: List[float], sequence_data: deque) -> dict:
+    """Receives landmarks, preprocesses, and predicts, providing continuous feedback."""
+    sequence_data.append(landmarks)
 
-# --- Pydantic Models ---
-class FrameData(BaseModel):
-    image: str  # Base64 encoded image 
-
-class PredictionResponse(BaseModel):
-    prediction: str
-    confidence: float
-    landmarks: Optional[Dict[str, Any]] = None
-
-# --- Synchronous Worker Function ---
-def process_frame_sync(frame_data: FrameData) -> Dict[str, Any]:
-    """
-    This function runs the synchronous, blocking ML/CV code.
-    It's designed to be called from the main async endpoint via run_in_executor.
-    """
-    global sequence_data_raw, prediction_buffer, current_prediction, current_confidence
-
-    try:
-        # Decode base64 image
-        image_data_str = frame_data.image.split(',')[1] if ',' in frame_data.image else frame_data.image
-        img_data = base64.b64decode(image_data_str)
-        
-        # Convert to OpenCV image
-        nparr = np.frombuffer(img_data, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if frame is None:
-            raise ValueError("Could not decode image from base64 string")  # 
-            
-    except Exception as e:
-        # Raise a specific error for invalid image data to be caught by the endpoint
-        raise ValueError(f"Invalid image data: {str(e)}") from e # 
-
-    # Pre-process frame for MediaPipe
-    frame = cv2.resize(frame, (640, 480))
-    frame.flags.writeable = False
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    
-    # Process with MediaPipe
-    results = holistic.process(frame_rgb)  # 
-    frame.flags.writeable = True  # 
-    
-    # Extract landmark data for frontend visualization
-    landmarks_for_fe = {
-        'pose': [{'x': p.x, 'y': p.y, 'z': p.z, 'visibility': p.visibility} 
-                 for p in (results.pose_landmarks.landmark if results.pose_landmarks else [])],
-        'leftHand': [{'x': p.x, 'y': p.y, 'z': p.z} 
-                     for p in (results.left_hand_landmarks.landmark if results.left_hand_landmarks else [])],  # 
-        'rightHand': [{'x': p.x, 'y': p.y, 'z': p.z} 
-                      for p in (results.right_hand_landmarks.landmark if results.right_hand_landmarks else [])]
-    }
-
-    # If no pose is detected, we can't proceed with prediction
-    if not results.pose_landmarks:
+    if len(sequence_data) < SEQUENCE_LENGTH:
         return {
-            "prediction": "No pose detected",
-            "confidence": 0.0,  # 
-            "landmarks": landmarks_for_fe
+            "status": "buffering",
+            "progress": len(sequence_data) / SEQUENCE_LENGTH
         }
 
-    # Extract keypoints for the model
     try:
-        keypoints = extract_focused_keypoints_realtime(results)
-        sequence_data_raw.append(keypoints)
+        X_seq_raw = np.array(list(sequence_data))
+        # The remainder of the prediction logic remains the same
+        X_reshaped = X_seq_raw.reshape(-1, X_seq_raw.shape[-1])
+        X_scaled = scaler.transform(X_reshaped)
+        X_scaled_reshaped = X_scaled.reshape(X_seq_raw.shape)
+        X_enhanced = add_temporal_features_realtime(X_scaled_reshaped)
+        X_input = np.expand_dims(X_enhanced, axis=0)
+        
+        prediction_probs = model.predict_on_batch(X_input)[0]
+        predicted_index = np.argmax(prediction_probs)
+        confidence = prediction_probs[predicted_index]
+
+        if confidence > CONFIDENCE_THRESHOLD:
+            return {
+                "status": "prediction",
+                "prediction": actions_map.get(predicted_index, "Unknown"),
+                "confidence": float(confidence * 100)
+            }
+        else:
+            return {"status": "low_confidence"}
+            
     except Exception as e:
-        raise RuntimeError(f"Error extracting landmarks for model: {str(e)}") from e # 
+        logger.error(f"Error during prediction pipeline: {e}", exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
+@app.websocket("/ws/predict")
+async def websocket_predict(websocket: WebSocket):
+    await websocket.accept()
+    logger.info("WebSocket connection established.")
     
-    # Perform prediction only if the sequence is full
-    if len(sequence_data_raw) == SEQUENCE_LENGTH:
-        try:
-            X_seq_raw = np.array(list(sequence_data_raw))
-            X_reshaped = X_seq_raw.reshape(-1, X_seq_raw.shape[-1])
-            X_scaled = scaler.transform(X_reshaped)  # 
-            X_scaled_reshaped = X_scaled.reshape(X_seq_raw.shape)
-            X_enhanced = add_temporal_features_realtime(X_scaled_reshaped)
-            X_input = np.expand_dims(X_enhanced, axis=0)
-            
-            # Use predict_on_batch for slight performance gain
-            prediction_probs = model.predict_on_batch(X_input)[0]  # 
-            predicted_index = np.argmax(prediction_probs)
-            confidence = prediction_probs[predicted_index]
-            
-            if confidence > PREDICTION_THRESHOLD:
-                prediction_buffer.append(predicted_index)  # 
-                
-            if len(prediction_buffer) > 0:
-                # Use a simple majority vote from the buffer for stability
-                most_common_pred_index = max(set(prediction_buffer), key=list(prediction_buffer).count)  # 
-                current_prediction = actions_map.get(most_common_pred_index, "...")
-                # Update confidence to reflect the latest confident prediction
-                if most_common_pred_index == predicted_index:
-                    current_confidence = confidence  # 
-
-        except Exception as e:
-            raise RuntimeError(f"Error during prediction processing: {str(e)}") from e
-
-    return {
-        "prediction": current_prediction,
-        "confidence": float(current_confidence * 100),  # 
-        "landmarks": landmarks_for_fe
-    }
-
-
-# --- API Endpoints ---
-@app.post("/api/predict", response_model=PredictionResponse)
-async def predict_frame(frame_data: FrameData, request: Request):
-    """
-    Asynchronous endpoint that runs the blocking ML code in a thread pool
-    to avoid blocking the server's event loop.
-    """
+    sequence_data = deque(maxlen=SEQUENCE_LENGTH)
     loop = asyncio.get_running_loop()
+
     try:
-        result = await loop.run_in_executor(
-            executor, process_frame_sync, frame_data
-        )
-        return PredictionResponse(**result)
-    except ValueError as e:
-        # Catches bad image data errors
-        raise HTTPException(status_code=400, detail=str(e))
+        while True:
+            landmarks_data = await websocket.receive_json()
+            # **IMPROVEMENT**: Added logging for received data length to help debug future mismatches.
+            if not isinstance(landmarks_data, list) or len(landmarks_data) != EXPECTED_LANDMARK_COUNT:
+                logger.warning(f"Received invalid data. Expected list of {EXPECTED_LANDMARK_COUNT}, got {len(landmarks_data)}")
+                continue
+
+            prediction_result = await loop.run_in_executor(
+                executor, predict_from_landmarks, landmarks_data, sequence_data
+            )
+            
+            # Always send the result back to the client.
+            await websocket.send_json(prediction_result)
+    except WebSocketDisconnect:
+        logger.info("WebSocket connection closed.")
     except Exception as e:
-        # Catches all other errors from the prediction pipeline
-        print(f"An unexpected error occurred: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {e}")
+        logger.error(f"An error occurred in the WebSocket handler: {e}", exc_info=True)
 
 
-@app.post("/api/reset")
-async def reset_sequence():
-    """Resets the prediction sequence and buffer."""
-    global sequence_data_raw, prediction_buffer, current_prediction, current_confidence
-    try:
-        sequence_data_raw.clear()  # 
-        prediction_buffer.clear()
-        current_prediction = "..."
-        current_confidence = 0.0
-        return {"status": "sequence reset", "success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error resetting sequence: {str(e)}")
 
 
-@app.get("/api/health")
-def health_check():
-    """Provides a health check of the API and loaded models."""
-    return {
-        "status": "healthy",
-        "model_loaded": model is not None,
-        "mediapipe_loaded": holistic is not None,  # 
-        "actions_count": len(actions_map),
-        "actions": actions_map
-    }
+@app.post("/api/video-predict")
+async def video_predict(file: UploadFile = File(...)):
+    input_path = f"uploads/{file.filename}"
+    output_path = f"outputs/annotated_{file.filename}"
+    os.makedirs("uploads", exist_ok=True)
+    os.makedirs("outputs", exist_ok=True)
+    with open(input_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    results = predict_on_video(input_path, output_path)
+    return JSONResponse({
+        "predictions": results,
+        "annotated_video_url": f"/api/download/{os.path.basename(output_path)}"
+    })
+
+@app.get("/api/download/{filename}")
+async def download_annotated_video(filename: str):
+    file_path = f"outputs/{filename}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path, media_type="video/mp4", filename=filename)
