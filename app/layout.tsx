@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/navbar";
+import { neobrutalism } from "@clerk/themes";
 import { auth } from "@clerk/nextjs/server";
 import {
   ClerkProvider,
@@ -29,6 +30,7 @@ export default async function RootLayout({
   return (
     <ClerkProvider
       appearance={{
+        baseTheme: neobrutalism,
         cssLayerName: "clerk",
       }}
     >

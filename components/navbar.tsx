@@ -75,8 +75,12 @@ export default function Navbar({ isLoggedIn }: Props) {
             </SignedIn>
             <SignedOut>
               <SignInButton>
-                <Button className="text-cyan-300/80 hover:text-cyan-300 cursor-pointer transition-colors font-medium text-xl">
-                  Sign In
+                <Button
+                  variant="secondary"
+                  className="relative overflow-hidden px-8 py-2 text-cyan-300/90 hover:text-white bg-gradient-to-r from-cyan-500/20 via-purple-500/10 to-pink-500/20 border border-cyan-400/40 shadow-md hover:shadow-lg transition-all duration-300 hover:cursor-pointer  text-xl rounded-full group"
+                >
+                  <span className="absolute left-0 top-0 w-full h-full bg-cyan-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></span>
+                  <span className="relative z-10">Sign In</span>
                 </Button>
               </SignInButton>
             </SignedOut>
