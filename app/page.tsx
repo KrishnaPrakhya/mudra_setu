@@ -54,6 +54,7 @@ function AnimatedBackground() {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none">
       {/* Neural network nodes */}
+
       {nodePositions.map((pos, i) => (
         <motion.div
           key={i}

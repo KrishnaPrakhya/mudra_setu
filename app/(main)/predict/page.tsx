@@ -3,16 +3,26 @@ import { useEffect, useRef } from "react";
 import { DrawingUtils, HolisticLandmarker } from "@mediapipe/tasks-vision";
 import PredictionPanel from "./_components/PredictionPanel";
 import { useSignLanguageRecognition } from "./_components/UseSignLanguageRecognition";
+import VideoControls from "./_components/VideoControls";
+import StatsPanel from "./_components/StatsPanel";
+import SettingsPanel from "./_components/SettingsPanel";
 
 export default function PredictPage() {
   const {
     videoRef,
     landmarks,
     predictions,
+    aggregatedPredictions,
     isCapturing,
     toggleCapture,
     isBuffering,
     progress,
+    speakPredictions,
+    clearPredictions,
+    exportPredictions,
+    stats,
+    settings,
+    updateSettings,
   } = useSignLanguageRecognition();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -60,7 +70,6 @@ export default function PredictPage() {
 
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-    // Flip the canvas context horizontally
     canvasCtx.scale(-1, 1);
     canvasCtx.translate(-canvas.width, 0);
 
@@ -70,10 +79,12 @@ export default function PredictPage() {
       drawingUtils.drawConnectors(
         landmarks.poseLandmarks[0],
         HolisticLandmarker.POSE_CONNECTIONS,
-        { color: "#FF0000" }
+        {
+          color: settings.poseColor,
+        }
       );
       drawingUtils.drawLandmarks(landmarks.poseLandmarks[0], {
-        color: "#FF0000",
+        color: settings.poseColor,
         lineWidth: 2,
       });
     }
@@ -81,10 +92,12 @@ export default function PredictPage() {
       drawingUtils.drawConnectors(
         landmarks.leftHandLandmarks[0],
         HolisticLandmarker.HAND_CONNECTIONS,
-        { color: "#00FF00" }
+        {
+          color: settings.leftHandColor,
+        }
       );
       drawingUtils.drawLandmarks(landmarks.leftHandLandmarks[0], {
-        color: "#00FF00",
+        color: settings.leftHandColor,
         lineWidth: 2,
       });
     }
@@ -92,58 +105,120 @@ export default function PredictPage() {
       drawingUtils.drawConnectors(
         landmarks.rightHandLandmarks[0],
         HolisticLandmarker.HAND_CONNECTIONS,
-        { color: "#0000FF" }
+        {
+          color: settings.rightHandColor,
+        }
       );
       drawingUtils.drawLandmarks(landmarks.rightHandLandmarks[0], {
-        color: "#0000FF",
+        color: settings.rightHandColor,
         lineWidth: 2,
       });
     }
     canvasCtx.restore();
-  }, [landmarks, videoRef]);
+  }, [landmarks, videoRef, settings]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 p-4 sm:p-8 text-white">
-      <div className="max-w-6xl mx-auto mt-[100px]">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white">
-            Real-Time Sign Recognition
-          </h1>
-          <p className="text-slate-400 text-lg">
-            Backend-Annotated Video Stream
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3 relative group">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform scale-x-[-1]"
-            />
-            <canvas
-              ref={canvasRef}
-              className="absolute top-0 left-0 w-full h-full"
-            />
-            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
-              <button
-                onClick={toggleCapture}
-                className="px-6 py-3 bg-cyan-500 text-white font-semibold rounded-lg shadow-lg hover:bg-cyan-600 active:scale-95 transition-all"
-              >
-                {isCapturing ? "Stop Capture" : "Start Capture"}
-              </button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+      {/* Header */}
+      <div className="top-24 pt-[100px]">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                Sign Language Recognition Studio
+              </h1>
+              <p className="text-slate-400 text-sm">
+                Real-time AI-powered sign detection
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    isCapturing ? "bg-green-500 animate-pulse" : "bg-red-500"
+                  }`}
+                />
+                <span className="text-sm font-medium">
+                  {isCapturing ? "LIVE" : "OFFLINE"}
+                </span>
+              </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="lg:col-span-2">
+      <div className="max-w-7xl mx-auto p-4 space-y-6">
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* Video Section */}
+          <div className="xl:col-span-8 space-y-4">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-cyan-600/20 rounded-2xl blur-xl" />
+              <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-purple-500/20 overflow-hidden">
+                <div className="aspect-video relative">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover transform scale-x-[-1]"
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    className="absolute top-0 left-0 w-full h-full"
+                  />
+
+                  {/* Video Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+
+                  {/* Status Indicators */}
+                  <div className="absolute top-4 left-4 flex gap-2">
+                    {isCapturing && (
+                      <div className="bg-red-500/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2">
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                        RECORDING
+                      </div>
+                    )}
+                    {isBuffering && (
+                      <div className="bg-yellow-500/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium">
+                        BUFFERING {Math.round(progress * 100)}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Video Controls */}
+                <VideoControls
+                  isCapturing={isCapturing}
+                  toggleCapture={toggleCapture}
+                  speakPredictions={speakPredictions}
+                  clearPredictions={clearPredictions}
+                  exportPredictions={exportPredictions}
+                  aggregatedCount={aggregatedPredictions.length}
+                />
+              </div>
+            </div>
+
+            {/* Stats Panel */}
+            <StatsPanel stats={stats} />
+          </div>
+
+          {/* Side Panel */}
+          <div className="xl:col-span-4 space-y-6">
+            {/* Predictions Panel */}
             <PredictionPanel
               predictions={predictions}
+              aggregatedPredictions={aggregatedPredictions}
               isCapturing={isCapturing}
               isBuffering={isBuffering}
               progress={progress}
-              fps={20} // This could be made dynamic in the hook
+              fps={20}
+            />
+
+            {/* Settings Panel */}
+            <SettingsPanel
+              settings={settings}
+              updateSettings={updateSettings}
             />
           </div>
         </div>

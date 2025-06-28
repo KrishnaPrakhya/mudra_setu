@@ -4,8 +4,17 @@ import { motion } from "framer-motion";
 import { Hand } from "lucide-react";
 import Link from "next/link";
 import React from "react";
+import { Button } from "./ui/button";
+import { SignIn, useClerk } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+interface Props {
+  isLoggedIn: boolean | null;
+}
 
-export default function Navbar() {
+export default function Navbar({ isLoggedIn }: Props) {
+  const { signOut } = useClerk();
+  const router = useRouter();
   return (
     <nav className="fixed top-0 w-full z-50 bg-black/10 backdrop-blur-xl border-b border-cyan-400/20">
       <div className="container mx-auto px-6 py-4">
@@ -44,24 +53,45 @@ export default function Navbar() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center space-x-8"
           >
-            <Link
-              href="/predict"
-              className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
-            >
-              Neural Predict
-            </Link>
-            <Link
-              href="/videoInput"
-              className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
-            >
-              Video Predict
-            </Link>
-            <Link
-              href="/visualize"
-              className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
-            >
-              3D Visualize
-            </Link>
+            <SignedIn>
+              <Link
+                href="/predict"
+                className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
+              >
+                Neural Predict
+              </Link>
+              <Link
+                href="/videoInput"
+                className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
+              >
+                Video Predict
+              </Link>
+              <Link
+                href="/visualize"
+                className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
+              >
+                3D Visualize
+              </Link>
+            </SignedIn>
+            <SignedOut>
+              <SignInButton>
+                <Button className="text-cyan-300/80 hover:text-cyan-300 cursor-pointer transition-colors font-medium text-xl">
+                  Sign In
+                </Button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-9 h-9 border-2 border-primary/20",
+                    userButtonPopoverCard: "shadow-lg",
+                    userPreviewMainIdentifier: "font-semibold",
+                  },
+                }}
+                afterSignOutUrl="/"
+              />
+            </SignedIn>
           </motion.div>
         </div>
       </div>
