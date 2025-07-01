@@ -14,7 +14,6 @@ import {
   Camera,
   ImageIcon,
   Cpu,
-  Network,
   Activity,
   Target,
 } from "lucide-react";
@@ -54,6 +53,7 @@ function AnimatedBackground() {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none">
       {/* Neural network nodes */}
+
       {nodePositions.map((pos, i) => (
         <motion.div
           key={i}
@@ -184,10 +184,10 @@ export default function HomePage() {
               <Link href="/predict">
                 <Button
                   size="lg"
-                  className="group relative bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-10 py-6 text-lg font-semibold rounded-xl overflow-hidden"
+                  className="group relative bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-10 py-6 text-lg font-semibold rounded-xl overflow-hidden hover:cursor-pointer"
                 >
                   <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity "
                     whileHover={{ scale: 1.05 }}
                   />
                   <span className="relative flex items-center">
@@ -375,8 +375,8 @@ export default function HomePage() {
 
               <p className="text-cyan-100/80 text-xl mb-10 max-w-3xl mx-auto">
                 Join thousands of researchers, developers, and innovators using
-                NeuroGesture to push the boundaries of human-computer
-                interaction through advanced AI.
+                MudraSetu to push the boundaries of human-computer interaction
+                through advanced AI.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-6 justify-center">
@@ -443,12 +443,12 @@ export default function HomePage() {
           <div className="flex items-center justify-center space-x-3 mb-6">
             <Hand className="h-8 w-8 text-cyan-400" />
             <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              NeuroGesture
+              MudraSetu
             </span>
           </div>
           <p className="text-cyan-100/50 font-mono">
-            © 2024 NeuroGesture AI. Advancing human-computer interaction
-            through neural intelligence.
+            © 2025 MudraSetu AI. Advancing human-computer interaction through
+            neural intelligence.
           </p>
         </div>
       </footer>

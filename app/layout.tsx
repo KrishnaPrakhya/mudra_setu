@@ -3,7 +3,16 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/navbar";
-
+import { neobrutalism } from "@clerk/themes";
+import { auth } from "@clerk/nextjs/server";
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from "@clerk/nextjs";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -12,17 +21,25 @@ export const metadata: Metadata = {
     "Advanced AI-powered platform for real-time sign language recognition and 3D gesture visualization",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { userId } = await auth();
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Navbar />
-        {children}
-      </body>
-    </html>
+    <ClerkProvider
+      appearance={{
+        baseTheme: neobrutalism,
+        cssLayerName: "clerk",
+      }}
+    >
+      <html lang="en">
+        <body className={inter.className}>
+          <Navbar isLoggedIn={!!userId} />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

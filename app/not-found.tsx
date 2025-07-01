@@ -1,10 +1,6 @@
 import React from "react";
 
-interface Props {}
-
-function NotFound(props: Props) {
-  const {} = props;
-
+function NotFound() {
   return (
     <div className="flex justify-center items-center min-h-screen">
       <h3>This Page Does not Exists ! Please Cooperate</h3>

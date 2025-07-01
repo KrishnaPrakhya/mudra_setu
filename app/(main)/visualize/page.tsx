@@ -11,14 +11,12 @@ import {
   ContactShadows,
 } from "@react-three/drei";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Hand,
-  ArrowLeft,
   Play,
   RotateCcw,
   Sparkles,
@@ -59,8 +57,8 @@ function RealisticHandModel({
   const ringTipRef = useRef<THREE.Group>(null);
   const pinkyTipRef = useRef<THREE.Group>(null);
 
-  // Base glow settings for attractive visualization
-  const [glowIntensity, setGlowIntensity] = useState(0.1);
+  // Base glow settings for attractive visualization (value is internally managed only via the setter)
+  const [, setGlowIntensity] = useState(0.1);
   const [glowColor, setGlowColor] = useState(new THREE.Color("#00ffaa"));
 
   const baseRefs = [thumbRef, indexRef, middleRef, ringRef, pinkyRef];
@@ -401,7 +399,7 @@ function RealisticHandModel({
   const FingerSegment = ({
     width,
     height,
-    depth,
+    depth: _depth,
     position = [0, 0, 0],
     isJoint = false,
   }: {

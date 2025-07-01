@@ -119,9 +119,4 @@ docker run -p 8000:8000 mudra-setu-backend
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-
-## 🙏 Acknowledgments
-
-- Thanks to all contributors who have helped shape Mudra Setu
-
 - Built with Next.js, FastAPI, and TensorFlow
