@@ -13,9 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Hand,
   Brain,
-  ArrowLeft,
   Camera,
   FileText,
   Zap,
@@ -125,6 +123,12 @@ export default function PredictPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Holds the interval ID for the fake real-time prediction loop so we can
+  // stop it later without storing it on the global `window` object.
+  const predictionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
+
   // Start webcam
   const startWebcam = async () => {
     try {
@@ -188,14 +192,15 @@ export default function PredictPage() {
     }, 800);
 
     // Store interval ID for cleanup
-    (window as any).predictionInterval = interval;
+    predictionIntervalRef.current = interval;
   };
 
   const stopRealTimePrediction = () => {
     setIsRecording(false);
     setNeuralActivity([]);
-    if ((window as any).predictionInterval) {
-      clearInterval((window as any).predictionInterval);
+    if (predictionIntervalRef.current) {
+      clearInterval(predictionIntervalRef.current);
+      predictionIntervalRef.current = null;
     }
   };
 

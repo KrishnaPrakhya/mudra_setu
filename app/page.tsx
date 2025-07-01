@@ -14,7 +14,6 @@ import {
   Camera,
   ImageIcon,
   Cpu,
-  Network,
   Activity,
   Target,
 } from "lucide-react";

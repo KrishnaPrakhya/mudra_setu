@@ -24,6 +24,16 @@ interface Prediction {
   timestamp: Date;
 }
 
+// Messages coming from the backend when we request/receive a prediction
+interface ServerPrediction {
+  status: "buffering" | "prediction";
+  // Progress is present while buffering
+  progress?: number;
+  // These two are present when status === "prediction"
+  prediction?: string;
+  confidence?: number;
+}
+
 interface CallSettings {
   videoQuality: "low" | "medium" | "high";
   audioEnabled: boolean;
@@ -119,7 +129,7 @@ export function useVideoCall() {
         setIsVideoEnabled(stream.getVideoTracks().length > 0);
         setIsAudioEnabled(stream.getAudioTracks().length > 0);
         return stream;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn(
           `getUserMedia failed with constraints ${JSON.stringify(
             constraints
@@ -128,9 +138,10 @@ export function useVideoCall() {
         );
         // Only keep trying if the error is related to device being busy or constraints issues
         if (
-          err?.name !== "NotReadableError" &&
-          err?.name !== "TrackStartError" &&
-          err?.name !== "OverconstrainedError"
+          !(err instanceof DOMException) ||
+          (err.name !== "NotReadableError" &&
+            err.name !== "TrackStartError" &&
+            err.name !== "OverconstrainedError")
         ) {
           // For permission denied or other fatal errors, break early
           break;
@@ -292,13 +303,14 @@ export function useVideoCall() {
   );
 
   const handlePrediction = useCallback(
-    (senderId: string, prediction: any) => {
+    (senderId: string, prediction: ServerPrediction) => {
       // Handle buffering status
       if (prediction.status === "buffering") {
+        const progress = prediction.progress ?? 0;
         const bufferingPrediction: Prediction = {
           id: "buffering",
-          prediction: `Buffering... (${Math.round(prediction.progress * 100)}%)`,
-          confidence: prediction.progress * 100,
+          prediction: `Buffering... (${Math.round(progress * 100)}%)`,
+          confidence: progress * 100,
           timestamp: new Date(),
         };
         if (senderId === localUserId) {
@@ -314,8 +326,8 @@ export function useVideoCall() {
       if (prediction.status === "prediction") {
         const newPrediction: Prediction = {
           id: Date.now().toString(),
-          prediction: prediction.prediction,
-          confidence: prediction.confidence,
+          prediction: prediction.prediction ?? "",
+          confidence: prediction.confidence ?? 0,
           timestamp: new Date(),
         };
 
@@ -327,7 +339,7 @@ export function useVideoCall() {
 
           if (settings.autoSpeak) {
             const utterance = new SpeechSynthesisUtterance(
-              prediction.prediction
+              prediction.prediction ?? ""
             );
             speechSynthesis.speak(utterance);
           }
@@ -446,7 +458,7 @@ export function useVideoCall() {
                 // Set participants including self, using the real ID from server
                 const allParticipants = [
                   { id: data.userId, name: userName, isLocal: true },
-                  ...data.participants.map((p: any) => ({
+                  ...data.participants.map((p: Participant) => ({
                     ...p,
                     isLocal: false,
                   })),
@@ -459,7 +471,7 @@ export function useVideoCall() {
                     "Found existing participants, initiating calls...",
                     data.participants
                   );
-                  data.participants.forEach((participant: any) => {
+                  data.participants.forEach((participant: Participant) => {
                     if (participant.id !== "local") {
                       initiateCall(participant.id);
                     }
