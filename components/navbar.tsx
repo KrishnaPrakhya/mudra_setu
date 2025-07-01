@@ -72,6 +72,12 @@ export default function Navbar({ isLoggedIn }: Props) {
               >
                 3D Visualize
               </Link>
+              <Link
+                href="/video-call"
+                className="text-cyan-300/80 hover:text-cyan-300 transition-colors font-medium"
+              >
+                Video Call
+              </Link>
             </SignedIn>
             <SignedOut>
               <SignInButton>
