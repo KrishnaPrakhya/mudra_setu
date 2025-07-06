@@ -302,25 +302,6 @@ export default function HomePage() {
                     <p className="text-cyan-100/70 leading-relaxed">
                       {feature.description}
                     </p>
-
-                    {/* Neural network pattern */}
-                    <div className="mt-6 flex justify-center space-x-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <motion.div
-                          key={i}
-                          className="w-2 h-2 bg-cyan-400/50 rounded-full"
-                          animate={{
-                            scale: [1, 1.5, 1],
-                            opacity: [0.5, 1, 0.5],
-                          }}
-                          transition={{
-                            duration: 1.5,
-                            repeat: Number.POSITIVE_INFINITY,
-                            delay: i * 0.2,
-                          }}
-                        />
-                      ))}
-                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
